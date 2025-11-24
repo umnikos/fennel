@@ -1400,6 +1400,7 @@ Deprecated.")
         (utils.propagate-options opts subopts)
         (compiler.compile1 (. forms i) subscope sub-chunk subopts)))))
 
+(var include-path-previously-called false)
 (fn include-path [ast opts path mod fennel?]
   "Helper function for include once we have determined the path to use."
   (tset utils.root.scope.includes mod :fnl/loading)
@@ -1407,10 +1408,15 @@ Deprecated.")
               (: (assert (f:read :*all)) :gsub "[\r\n]*$" ""))
         ;; splice in source and memoize it in compiler AND package.preload
         ;; so we can include it again without duplication, even in runtime
-        ret (utils.expr (.. "require(\"" mod "\")") :statement)
-        target (: "package.preload[%q]" :format mod)
+        ret (utils.expr (.. "include(\"" mod "\")") :statement)
+        target (: "include.preload[%q]" :format mod)
+        include-head "local include={preload={},loaded={}}\nsetmetatable(include,{__call=function(self,module,...)\nif include.loaded[module] == nil then include.loaded[module] = include.preload[module](...) end\nif include.loaded[module] == nil then include.loaded[module] = true end\nreturn include.loaded[module] end})"
         preload-str (.. target " = " target " or function(...)")
         (temp-chunk sub-chunk) (values [] [])]
+    ;; Emit include code into the root chunk if that hasn't been done yet
+    (when (not include-path-previously-called)
+      (compiler.emit temp-chunk include-head)
+      (set include-path-previously-called true))
     (compiler.emit temp-chunk preload-str ast)
     (compiler.emit temp-chunk sub-chunk)
     (compiler.emit temp-chunk :end ast)
