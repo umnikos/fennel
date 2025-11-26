@@ -627,10 +627,12 @@ the condition evaluates to truthy. Similar to cond in other lisps.")
   (for [i (- (length bindings) 1) 3 -1]
     (case (clause? (. bindings i))
       (where (or false nil)) until
-      clause (do (compiler.assert (and (= clause :until) (not until))
+      clause (do (compiler.assert (and (or (= clause :until) (= clause :while)) (not until))
                                   (.. "unexpected iterator clause: " clause) ast)
                  (table.remove bindings i)
-                 (set until (table.remove bindings i)))))
+                 (set until (table.remove bindings i))
+                 (if (= clause :while)
+                   (set until (utils.list (utils.sym :not) until))))))
   until)
 
 (fn compile-until [?condition scope chunk]
