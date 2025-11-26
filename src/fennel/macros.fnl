@@ -33,6 +33,16 @@ rather than the first."
       (set x elt)))
   x)
 
+(fn <<-* [...]
+  "Reverse thread-last macro.
+Same as ->>, except the arguments are iterated backwards (from last to first).
+Useful for nesting ifs, loops, callback functions, and other structures."
+  (local args [...])
+  (local revargs [])
+  (for [i (length args) 1 -1]
+    (table.insert revargs (. args i)))
+  (->>* (unpack revargs)))
+
 (fn -?>* [val ?e ...]
   "Nil-safe thread-first macro.
 Same as -> except will short-circuit with nil when it encounters a nil value."
@@ -180,31 +190,37 @@ returns
              (tset tbl# k# v#))))
        tbl#)))
 
-(fn seq-collect [how iter-tbl value-expr ...]
+(fn seq-collect [how iter-tbl ...]
   "Common part between icollect and fcollect for producing sequential tables.
 
 Iteration code only differs in using the for or each keyword, the rest
 of the generated code is identical."
-  (assert (not= nil value-expr) "expected table value expression")
-  (assert (= nil ...)
-          "expected exactly one body expression. Wrap multiple expressions in do")
-  (let [(into intoless-iter) (extract-into iter-tbl (copy iter-tbl))]
+  (assert (not= nil ...) "expected table value expression")
+  ; (assert (= nil ...)
+  ;         "expected exactly one body expression. Wrap multiple expressions in do")
+  (let [(into intoless-iter) (extract-into iter-tbl (copy iter-tbl))
+        isym (gensym :i)
+        tblsym (gensym :tbl)]
     (if into
-        `(let [tbl# ,into]
-           (,how ,intoless-iter (let [val# ,value-expr]
-                                  (table.insert tbl# val#)))
-           tbl#)
+        `(let [,tblsym ,into]
+           (,how ,intoless-iter
+              (do ,(unpack (icollect [_ value-expr (ipairs [...])]
+                `(let [val# ,value-expr]
+                   (table.insert ,tblsym val#))))))
+           ,tblsym)
         ;; believe it or not, using a var here has a pretty good performance
         ;; boost: https://p.hagelb.org/icollect-performance.html
         ;; but it doesn't always work with &into clauses, so skip if that's used
-        `(let [tbl# []]
-           (var i# 0)
+        `(let [,tblsym []]
+           (var ,isym 0)
            (,how ,iter-tbl
-                 (let [val# ,value-expr]
+              (do ,(unpack (icollect [_ value-expr (ipairs [...])]
+                `(let [val# ,value-expr]
                    (when (not= nil val#)
-                     (set i# (+ i# 1))
-                     (tset tbl# i# val#))))
-           tbl#))))
+                     (set ,isym (+ ,isym 1))
+                     (tset ,tblsym ,isym val#))))))
+              )
+           ,tblsym))))
 
 (fn icollect* [iter-tbl value-expr ...]
   "Return a sequential table made by running an iterator and evaluating an
@@ -426,6 +442,7 @@ REPL `,return` command returns values to assert in place to continue execution."
  :->> ->>*
  :-?> -?>*
  :-?>> -?>>*
+ :<<- <<-*
  :?. ?dot
  :doto doto*
  :when when*

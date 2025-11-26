@@ -17,11 +17,18 @@
       (.. (string.rep ">" (+ depth 1)) " ")
       (.. (string.rep "." (+ depth 1)) " ")))
 
+(local history [])
+
 (fn default-read-chunk [parser-state]
   (io.write (prompt-for (= 0 parser-state.stack-size)))
   (io.flush)
-  (case (io.read)
-    input (.. input "\n")))
+  (if _G.read
+    (let [input (_G.read nil history)]
+      (table.insert history input)
+      (.. input "\n"))
+    (case (io.read)
+      input (.. input "\n")))
+  )
 
 (fn default-on-values [xs]
   (io.write (table.concat xs "\t"))
@@ -30,8 +37,9 @@
 ;; fnlfmt: skip
 (fn default-on-error [errtype err]
   (io.write
-   (case errtype
-     "Runtime" (.. (compiler.traceback (tostring err) 4) "\n")
+   (case [errtype err]
+     ["Parse" "Terminated"] (error "Terminated" 0)
+     ["Runtime" _] (.. (compiler.traceback (tostring err) 4) "\n")
      _ (: "%s error: %s\n" :format errtype (tostring err)))))
 
 (fn splice-save-locals [env lua-source scope]
@@ -355,7 +363,7 @@ For more information about the language, see https://fennel-lang.org/reference")
         readline (and (should-use-readline? opts)
                       (try-readline! opts (pcall require :readline)))
         _ (when ?fennelrc (?fennelrc))
-        env (specials.wrap-env (or opts.env (rawget _G :_ENV) _G))
+        env (specials.wrap-env (or opts.env _ENV _G))
         callbacks {:readChunk (or opts.readChunk default-read-chunk)
                    :onValues (or opts.onValues default-on-values)
                    :onError (or opts.onError default-on-error)
@@ -377,8 +385,9 @@ For more information about the language, see https://fennel-lang.org/reference")
     (set (opts.env opts.scope) (values env (compiler.make-scope)))
     ;; use metadata unless we've specifically disabled it
     (set opts.useMetadata (not= opts.useMetadata false))
-    (when (= opts.allowedGlobals nil)
-      (set opts.allowedGlobals (specials.current-global-names env)))
+    ; FIXME: when _ENV is not _G just iterating it with pairs will not do
+    ; (when (= opts.allowedGlobals nil)
+    ;   (set opts.allowedGlobals (specials.current-global-names env)))
     (when opts.init (opts.init opts depth))
     (when opts.registerCompleter
       (opts.registerCompleter (partial completer env opts.scope)))

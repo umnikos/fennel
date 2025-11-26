@@ -4,7 +4,7 @@ local fennel = dofile("bootstrap/fennel.lua")
 
 local opts = {
    ["compiler-env"]=_G,
-   allowedGlobals={},
+   allowedGlobals={"_ENV"},
    useMetadata=false,
    filename=assert(arg[1]),
 }

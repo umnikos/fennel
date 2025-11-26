@@ -54,8 +54,7 @@ fennel: src/launcher.fnl $(SRC) bootstrap/aot.lua $(PRECOMPILED)
 	FENNEL_PATH=src/?.fnl $(LUA) bootstrap/aot.lua $< --require-as-include >> $@
 	@chmod 755 $@
 
-# Library file
-fennel.lua: $(SRC) bootstrap/aot.lua $(PRECOMPILED)
+fennel.lua: src/launcher.fnl $(SRC) bootstrap/aot.lua $(PRECOMPILED)
 	@echo "-- SPDX-License-Identifier: MIT" > $@
 	@echo "-- SPDX-FileCopyrightText: Calvin Rose and contributors" >> $@
 	FENNEL_PATH=src/?.fnl $(LUA) bootstrap/aot.lua $< --require-as-include >> $@

@@ -403,15 +403,16 @@ if opts contains the nval option."
       (doto exprs (tset :returned true))))
 
 (fn find-macro [ast scope]
-  (let [macro* (-?>> (utils.sym? (. ast 1)) (tostring) (. scope.macros))
-        multi-sym-parts (utils.multi-sym? (. ast 1))]
-    (if (and (not macro*) multi-sym-parts)
-        (let [nested-macro (utils.get-in scope.macros multi-sym-parts)]
-          (assert-compile (or (not (. scope.macros (. multi-sym-parts 1)))
-                              (utils.callable? nested-macro))
-                          "macro not found, or not callable, in macro table" (. ast 1))
-          nested-macro)
-        macro*)))
+  (if (utils.callable? ast) ast
+    (let [macro* (-?>> (utils.sym? ast) (tostring) (. scope.macros))
+          multi-sym-parts (utils.multi-sym? (. ast 1))]
+      (if (and (not macro*) multi-sym-parts)
+          (let [nested-macro (utils.get-in scope.macros multi-sym-parts)]
+            (assert-compile (or (not (. scope.macros (. multi-sym-parts 1)))
+                                (utils.callable? nested-macro))
+                            "macro not found, or not callable, in macro table" (. ast 1))
+            nested-macro)
+          macro*))))
 
 (fn propagate-trace-info [{: filename : line : col : bytestart : byteend} _index node]
   "The stack trace info should be based on the macro caller, not the macro AST."
@@ -445,16 +446,26 @@ if opts contains the nval option."
           (doto table.remove)
           (table.concat "\n"))))
 
-(fn macroexpand* [ast scope ?once]
-  "Expand macros in the ast. Only do one iteration if once is true."
-  (case (if (utils.list? ast) (find-macro ast scope))
+(fn macroexpand* [ast scope ?once ?recursing]
+  "Expand macros in the ast."
+  (case (if (utils.list? ast)
+              (let [first (. ast 1)] (find-macro (macroexpand* first scope nil true) scope))
+            (utils.sym? ast)
+              (find-macro ast scope))
     false ast
     macro* (let [old-scope scopes.macro
                  _ (set scopes.macro scope)
-                 (ok transformed) (xpcall #(macro* (unpack ast 2))
+                 (ok transformed) (if (utils.list? ast)
+                   (do
+                     ; FIXME: for some reason this never triggers and instead the error happens elsewhere
+                     ; but I can't figure out where else the macro would be called
+                     (assert-compile (utils.callable? macro*) "tried to call a macro that isn't a function" ast)
+                     (xpcall #(macro* (unpack ast 2))
                                           (if (built-in? macro*)
                                               tostring
-                                              macro-traceback))]
+                                              macro-traceback)))
+                   (values true macro*))]
+             (assert-compile (or ?recursing (not (utils.callable? transformed)))  "tried to reference a function macro without calling it" ast)
              (utils.walk-tree transformed
                               #(propagate-trace-info ast (quote-literal-nils $...)))
              (set scopes.macro old-scope)
@@ -1054,7 +1065,7 @@ compiler by default; these can be re-enabled with export FENNEL_DEBUG=trace."
       (let [mapped (quote-all form true)
             filename (if form.filename (string.format "%q" form.filename) :nil)]
         (assert-compile (not runtime?) "lists may only be used at compile time"
-                        form)
+                      form)
         ;; Constructing a list and then adding file/line data to it triggers a
         ;; bug where it changes the value of # for lists that contain nils in
         ;; them; constructing the list all in one go with the source data and

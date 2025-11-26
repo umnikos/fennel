@@ -49,7 +49,7 @@ will see its values updated as expected, regardless of mangling rules."
 
 (fn load-code [code ?env ?filename]
   "Load Lua code with an environment in all recent Lua versions"
-  (let [env (or ?env (rawget _G :_ENV) _G)]
+  (let [env (or ?env _ENV _G)]
     (case (values (rawget _G :setfenv) (rawget _G :loadstring))
       ;; luajit allows mode=t but PUC 5.1 just ignores it =(
       (setfenv loadstring) (let [f (assert (loadstring code ?filename :t))]
@@ -627,10 +627,12 @@ the condition evaluates to truthy. Similar to cond in other lisps.")
   (for [i (- (length bindings) 1) 3 -1]
     (case (clause? (. bindings i))
       (where (or false nil)) until
-      clause (do (compiler.assert (and (= clause :until) (not until))
+      clause (do (compiler.assert (and (or (= clause :until) (= clause :while)) (not until))
                                   (.. "unexpected iterator clause: " clause) ast)
                  (table.remove bindings i)
-                 (set until (table.remove bindings i)))))
+                 (set until (table.remove bindings i))
+                 (if (= clause :while)
+                   (set until (utils.list (utils.sym :not) until))))))
   until)
 
 (fn compile-until [?condition scope chunk]
@@ -1225,6 +1227,15 @@ Only works in Lua 5.3+ or LuaJIT with the --use-bit-lib flag.")
                             (compiler.macroexpand form
                                                   compiler.scopes.macro))}]
     (set env._G env)
+    (set env.load (fn [ld source _mode e]
+      (load ld source :t (or e env))))
+    (set env.compile (fn [ast]
+      (let [opts (utils.copy utils.root.options)
+        _ (set opts.scope (compiler.make-scope compiler.scopes.compiler))
+        _ (set opts.allowedGlobals (current-global-names env))
+        res (compiler.compile ast opts)]
+      res)))
+
     (setmetatable env
                   {:__index provided
                    :__newindex provided
@@ -1345,8 +1356,8 @@ modules in the compiler environment."
 (fn add-macros [macros* ast scope]
   (compiler.assert (utils.table? macros*) "expected macros to be table" ast)
   (each [k v (pairs macros*)]
-    (compiler.assert (utils.callable? v)
-                     "expected each macro to be function or callable table" ast)
+    ; (compiler.assert (or (utils.callable? v) (utils.sym? v) (utils.list? v)) ; FIXME: add ability to return lists as well
+    ;                  "expected each macro to be function, callable table, or an ast literal" ast)
     (compiler.check-binding-valid (utils.sym k) scope ast {:macro? true})
     (tset scope.macros k v)))
 
