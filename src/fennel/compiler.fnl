@@ -403,7 +403,7 @@ if opts contains the nval option."
       (doto exprs (tset :returned true))))
 
 (fn find-macro [ast scope]
-  (let [macro* (-?>> (utils.sym? (. ast 1)) (tostring) (. scope.macros))
+  (let [macro* (-?>> (utils.sym? ast) (tostring) (. scope.macros))
         multi-sym-parts (utils.multi-sym? (. ast 1))]
     (if (and (not macro*) multi-sym-parts)
         (let [nested-macro (utils.get-in scope.macros multi-sym-parts)]
@@ -447,14 +447,16 @@ if opts contains the nval option."
 
 (fn macroexpand* [ast scope ?once]
   "Expand macros in the ast. Only do one iteration if once is true."
-  (case (if (utils.list? ast) (find-macro ast scope))
+  (case (if (utils.list? ast) (find-macro (. ast 1) scope) (utils.sym? ast) (find-macro ast scope))
     false ast
     macro* (let [old-scope scopes.macro
                  _ (set scopes.macro scope)
-                 (ok transformed) (xpcall #(macro* (unpack ast 2))
+                 (ok transformed) (if (utils.callable? macro*)
+                   (xpcall #(macro* (unpack ast 2))
                                           (if (built-in? macro*)
                                               tostring
-                                              macro-traceback))]
+                                              macro-traceback))
+                    (values true macro*))]
              (utils.walk-tree transformed
                               #(propagate-trace-info ast (quote-literal-nils $...)))
              (set scopes.macro old-scope)

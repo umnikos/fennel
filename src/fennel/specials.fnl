@@ -1345,8 +1345,8 @@ modules in the compiler environment."
 (fn add-macros [macros* ast scope]
   (compiler.assert (utils.table? macros*) "expected macros to be table" ast)
   (each [k v (pairs macros*)]
-    (compiler.assert (utils.callable? v)
-                     "expected each macro to be function or callable table" ast)
+    (compiler.assert (or (utils.callable? v) (utils.sym? v) (utils.list? v)) ; FIXME: add ability to return lists as well
+                     "expected each macro to be function, callable table, or an ast literal" ast)
     (compiler.check-binding-valid (utils.sym k) scope ast {:macro? true})
     (tset scope.macros k v)))
 
