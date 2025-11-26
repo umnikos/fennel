@@ -30,8 +30,9 @@
 ;; fnlfmt: skip
 (fn default-on-error [errtype err]
   (io.write
-   (case errtype
-     "Runtime" (.. (compiler.traceback (tostring err) 4) "\n")
+   (case [errtype err]
+     ["Parse" "Terminated"] (error "Terminated" 0)
+     ["Runtime" _] (.. (compiler.traceback (tostring err) 4) "\n")
      _ (: "%s error: %s\n" :format errtype (tostring err)))))
 
 (fn splice-save-locals [env lua-source scope]
