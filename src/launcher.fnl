@@ -1,5 +1,8 @@
 ;; This is the command-line entry point for Fennel.
 
+(if (not (?. os :getenv))
+  (set os.getenv (fn [])))
+
 (local fennel (require :fennel))
 (local {: pack : unpack} (require :fennel.utils))
 
