@@ -403,15 +403,16 @@ if opts contains the nval option."
       (doto exprs (tset :returned true))))
 
 (fn find-macro [ast scope]
-  (let [macro* (-?>> (utils.sym? ast) (tostring) (. scope.macros))
-        multi-sym-parts (utils.multi-sym? (. ast 1))]
-    (if (and (not macro*) multi-sym-parts)
-        (let [nested-macro (utils.get-in scope.macros multi-sym-parts)]
-          (assert-compile (or (not (. scope.macros (. multi-sym-parts 1)))
-                              (utils.callable? nested-macro))
-                          "macro not found, or not callable, in macro table" (. ast 1))
-          nested-macro)
-        macro*)))
+  (if (utils.callable? ast) ast
+    (let [macro* (-?>> (utils.sym? ast) (tostring) (. scope.macros))
+          multi-sym-parts (utils.multi-sym? (. ast 1))]
+      (if (and (not macro*) multi-sym-parts)
+          (let [nested-macro (utils.get-in scope.macros multi-sym-parts)]
+            (assert-compile (or (not (. scope.macros (. multi-sym-parts 1)))
+                                (utils.callable? nested-macro))
+                            "macro not found, or not callable, in macro table" (. ast 1))
+            nested-macro)
+          macro*))))
 
 (fn propagate-trace-info [{: filename : line : col : bytestart : byteend} _index node]
   "The stack trace info should be based on the macro caller, not the macro AST."
@@ -447,7 +448,10 @@ if opts contains the nval option."
 
 (fn macroexpand* [ast scope ?once]
   "Expand macros in the ast. Only do one iteration if once is true."
-  (case (if (utils.list? ast) (find-macro (. ast 1) scope) (utils.sym? ast) (find-macro ast scope))
+  (case (if (utils.list? ast)
+              (let [first (. ast 1)] (find-macro (if (utils.list? first) (macroexpand* first scope) first) scope))
+            (utils.sym? ast)
+              (find-macro ast scope))
     false ast
     macro* (let [old-scope scopes.macro
                  _ (set scopes.macro scope)
