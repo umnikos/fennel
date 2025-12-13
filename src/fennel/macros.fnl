@@ -33,6 +33,16 @@ rather than the first."
       (set x elt)))
   x)
 
+(fn <<-* [...]
+  "Reverse thread-last macro.
+Same as ->>, except the arguments are iterated backwards (from last to first).
+Useful for nesting ifs, loops, callback functions, and other structures."
+  (local args [...])
+  (local revargs [])
+  (for [i (length args) 1 -1]
+    (table.insert revargs (. args i)))
+  (->>* (unpack revargs)))
+
 (fn -?>* [val ?e ...]
   "Nil-safe thread-first macro.
 Same as -> except will short-circuit with nil when it encounters a nil value."
@@ -426,6 +436,7 @@ REPL `,return` command returns values to assert in place to continue execution."
  :->> ->>*
  :-?> -?>*
  :-?>> -?>>*
+ :<<- <<-*
  :?. ?dot
  :doto doto*
  :when when*
