@@ -446,10 +446,10 @@ if opts contains the nval option."
           (doto table.remove)
           (table.concat "\n"))))
 
-(fn macroexpand* [ast scope ?once]
+(fn macroexpand* [ast scope ?once ?recursing]
   "Expand macros in the ast. Only do one iteration if once is true."
   (case (if (utils.list? ast)
-              (let [first (. ast 1)] (find-macro (if (utils.list? first) (macroexpand* first scope) first) scope))
+              (let [first (. ast 1)] (find-macro (if (utils.list? first) (macroexpand* first scope nil true) first) scope))
             (utils.sym? ast)
               (find-macro ast scope))
     false ast
@@ -461,6 +461,7 @@ if opts contains the nval option."
                                               tostring
                                               macro-traceback))
                     (values true macro*))]
+             (assert-compile (or ?recursing (not (utils.callable? transformed)))  "tried to reference a function macro without calling it" ast)
              (utils.walk-tree transformed
                               #(propagate-trace-info ast (quote-literal-nils $...)))
              (set scopes.macro old-scope)
