@@ -17,11 +17,18 @@
       (.. (string.rep ">" (+ depth 1)) " ")
       (.. (string.rep "." (+ depth 1)) " ")))
 
+(local history [])
+
 (fn default-read-chunk [parser-state]
   (io.write (prompt-for (= 0 parser-state.stack-size)))
   (io.flush)
-  (case (io.read)
-    input (.. input "\n")))
+  (if _G.read
+    (let [input (_G.read nil history)]
+      (table.insert history input)
+      (.. input "\n"))
+    (case (io.read)
+      input (.. input "\n")))
+  )
 
 (fn default-on-values [xs]
   (io.write (table.concat xs "\t"))
