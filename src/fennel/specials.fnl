@@ -49,7 +49,7 @@ will see its values updated as expected, regardless of mangling rules."
 
 (fn load-code [code ?env ?filename]
   "Load Lua code with an environment in all recent Lua versions"
-  (let [env (or ?env (rawget _G :_ENV) _G)]
+  (let [env (or ?env _ENV _G)]
     (case (values (rawget _G :setfenv) (rawget _G :loadstring))
       ;; luajit allows mode=t but PUC 5.1 just ignores it =(
       (setfenv loadstring) (let [f (assert (loadstring code ?filename :t))]
