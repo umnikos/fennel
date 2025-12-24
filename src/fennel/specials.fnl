@@ -1207,6 +1207,7 @@ Only works in Lua 5.3+ or LuaJIT with the --use-bit-lib flag.")
              :sequence utils.sequence :sequence? utils.sequence?
              :sym utils.sym :sym? utils.sym? :multi-sym? utils.multi-sym?
              :comment utils.comment :comment? utils.comment? :varg? utils.varg?
+             :compile compiler.compile
              ;; scoping functions
              :gensym (fn [base]
                        (utils.sym (compiler.gensym (or compiler.scopes.macro
