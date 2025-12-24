@@ -447,20 +447,24 @@ if opts contains the nval option."
           (table.concat "\n"))))
 
 (fn macroexpand* [ast scope ?once ?recursing]
-  "Expand macros in the ast. Only do one iteration if once is true."
+  "Expand macros in the ast."
   (case (if (utils.list? ast)
-              (let [first (. ast 1)] (find-macro (if (utils.list? first) (macroexpand* first scope nil true) first) scope))
+              (let [first (. ast 1)] (find-macro (macroexpand* first scope nil true) scope))
             (utils.sym? ast)
               (find-macro ast scope))
     false ast
     macro* (let [old-scope scopes.macro
                  _ (set scopes.macro scope)
-                 (ok transformed) (if (utils.callable? macro*)
-                   (xpcall #(macro* (unpack ast 2))
+                 (ok transformed) (if (utils.list? ast)
+                   (do
+                     ; FIXME: for some reason this never triggers and instead the error happens elsewhere
+                     ; but I can't figure out where else the macro would be called
+                     (assert-compile (utils.callable? macro*) "tried to call a macro that isn't a function" ast)
+                     (xpcall #(macro* (unpack ast 2))
                                           (if (built-in? macro*)
                                               tostring
-                                              macro-traceback))
-                    (values true macro*))]
+                                              macro-traceback)))
+                   (values true macro*))]
              (assert-compile (or ?recursing (not (utils.callable? transformed)))  "tried to reference a function macro without calling it" ast)
              (utils.walk-tree transformed
                               #(propagate-trace-info ast (quote-literal-nils $...)))
