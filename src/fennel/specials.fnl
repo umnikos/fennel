@@ -1226,6 +1226,8 @@ Only works in Lua 5.3+ or LuaJIT with the --use-bit-lib flag.")
                             (compiler.macroexpand form
                                                   compiler.scopes.macro))}]
     (set env._G env)
+    (set env.load (fn [ld source _mode e]
+      (load ld source :t (or e env))))
     (setmetatable env
                   {:__index provided
                    :__newindex provided
