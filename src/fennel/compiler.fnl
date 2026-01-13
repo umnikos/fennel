@@ -1054,7 +1054,7 @@ compiler by default; these can be re-enabled with export FENNEL_DEBUG=trace."
       (let [mapped (quote-all form true)
             filename (if form.filename (string.format "%q" form.filename) :nil)]
         (assert-compile (not runtime?) "lists may only be used at compile time"
-                        form)
+                      form)
         ;; Constructing a list and then adding file/line data to it triggers a
         ;; bug where it changes the value of # for lists that contain nils in
         ;; them; constructing the list all in one go with the source data and

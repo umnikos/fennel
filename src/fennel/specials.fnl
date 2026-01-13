@@ -1207,7 +1207,6 @@ Only works in Lua 5.3+ or LuaJIT with the --use-bit-lib flag.")
              :sequence utils.sequence :sequence? utils.sequence?
              :sym utils.sym :sym? utils.sym? :multi-sym? utils.multi-sym?
              :comment utils.comment :comment? utils.comment? :varg? utils.varg?
-             :compile (fn [ast] (let [res (compiler.compile ast)] res))
              ;; scoping functions
              :gensym (fn [base]
                        (utils.sym (compiler.gensym (or compiler.scopes.macro
@@ -1228,6 +1227,13 @@ Only works in Lua 5.3+ or LuaJIT with the --use-bit-lib flag.")
     (set env._G env)
     (set env.load (fn [ld source _mode e]
       (load ld source :t (or e env))))
+    (set env.compile (fn [ast]
+      (let [opts (utils.copy utils.root.options)
+        _ (set opts.scope (compiler.make-scope compiler.scopes.compiler))
+        _ (set opts.allowedGlobals (current-global-names env))
+        res (compiler.compile ast opts)]
+      res)))
+
     (setmetatable env
                   {:__index provided
                    :__newindex provided
